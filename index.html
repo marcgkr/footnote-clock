@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#5FBFBB">
+<title>FootNote Clock-in</title>
+<link rel="icon" href="logo.png">
+<style>
+  :root {
+    --teal: #4FA9A5;
+    --teal-deep: #3E8E8A;
+    --teal-soft: #E3F3F2;
+    --ink: #2F3439;
+    --muted: #6B7079;
+    --bg: #F6F8F7;
+    --card: #FFFFFF;
+    --line: #DCE3E2;
+    --out: #C8734B;
+    --out-soft: #F8E9E1;
+    --err: #B3402F;
+    --err-soft: #FBEAE7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --teal: #5FBFBB; --teal-deep: #7FD0CC; --teal-soft: #1C3634;
+      --ink: #EEF2F1; --muted: #A3AAB0; --bg: #121615; --card: #1B2120; --line: #2C3533;
+      --out: #E39470; --out-soft: #3A2A22; --err: #F08C7C; --err-soft: #3A2220;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+  }
+  main { width: 100%; max-width: 420px; flex: 1; display: flex; flex-direction: column; }
+  header { text-align: center; margin: 4px 0 18px; }
+  .logo { width: 92px; height: 92px; object-fit: contain; border-radius: 20px; background: #fff; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 26px 22px; text-align: center; }
+  section[hidden] { display: none; }
+  .outlet {
+    display: inline-block; margin: 0 0 12px; padding: 5px 12px; border-radius: 99px;
+    background: var(--teal-soft); color: var(--teal-deep); font-size: 13px; font-weight: 600; letter-spacing: .02em;
+  }
+  h1 { font-size: 24px; line-height: 1.2; margin: 0 0 6px; font-weight: 700; }
+  .muted { color: var(--muted); margin: 0; }
+  .small { font-size: 13px; }
+  .clock { font-size: 52px; font-weight: 300; letter-spacing: -.02em; margin: 10px 0 2px; font-variant-numeric: tabular-nums; }
+  .date { color: var(--muted); margin: 0 0 18px; }
+
+  .punch {
+    -webkit-appearance: none; appearance: none; border: 0; cursor: pointer;
+    width: 200px; height: 200px; border-radius: 50%; margin: 20px auto 16px; display: flex;
+    align-items: center; justify-content: center; flex-direction: column; gap: 4px;
+    font-family: inherit; font-weight: 700; font-size: 26px; line-height: 1.1; color: #fff; background: var(--teal);
+    box-shadow: 0 10px 30px -10px var(--teal), inset 0 -6px 0 rgba(0,0,0,.12);
+    transition: transform .08s ease, opacity .2s ease;
+  }
+  .punch small { font-weight: 500; font-size: 13px; opacity: .9; }
+  .punch.out { background: var(--out); box-shadow: 0 10px 30px -10px var(--out), inset 0 -6px 0 rgba(0,0,0,.12); }
+  .punch:active { transform: scale(.97); }
+  .punch:disabled { opacity: .6; cursor: default; }
+
+  .gps { font-size: 14px; margin: 0 0 6px; color: var(--muted); }
+  .gps.ok { color: var(--teal-deep); }
+  .gps.bad { color: var(--err); }
+
+  label { display: block; text-align: left; font-weight: 600; font-size: 14px; margin: 16px 0 0; }
+  select, input {
+    display: block; width: 100%; margin-top: 6px; padding: 14px; font: inherit; font-size: 18px;
+    color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+  }
+  input { letter-spacing: .3em; }
+  select:focus, input:focus { outline: 2px solid var(--teal); outline-offset: 1px; }
+  .primary {
+    -webkit-appearance: none; appearance: none; border: 0; cursor: pointer; width: 100%; margin-top: 20px;
+    padding: 15px; border-radius: 12px; background: var(--teal); color: #fff; font-family: inherit; font-weight: 700; font-size: 17px;
+  }
+  .primary:disabled { opacity: .6; }
+  .err { display: none; margin: 14px 0 0; padding: 12px 14px; border-radius: 12px; background: var(--err-soft); color: var(--err); font-size: 15px; text-align: left; }
+  .err.show { display: block; }
+
+  .tick {
+    width: 96px; height: 96px; border-radius: 50%; margin: 6px auto 16px; display: flex; align-items: center; justify-content: center;
+    background: var(--teal-soft); color: var(--teal-deep); font-size: 50px; font-weight: 700;
+  }
+  .tick.out { background: var(--out-soft); color: var(--out); }
+  .big-time { font-size: 40px; font-weight: 300; margin: 4px 0; font-variant-numeric: tabular-nums; }
+  .note { margin: 14px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--bg); font-size: 15px; }
+  .note.warn { background: var(--err-soft); color: var(--err); }
+
+  .spinner { width: 34px; height: 34px; margin: 10px auto 14px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--teal); animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  footer { margin-top: 18px; text-align: center; font-size: 13px; color: var(--muted); }
+  .link { background: none; border: 0; padding: 0; font: inherit; color: var(--teal-deep); text-decoration: underline; cursor: pointer; }
+  footer[hidden] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <header><img class="logo" src="logo.png" alt="FootNote Reflexology"></header>
+
+  <section id="s-loading">
+    <div class="spinner" aria-hidden="true"></div>
+    <p class="muted">Checking in with FootNote…</p>
+  </section>
+
+  <section id="s-register" hidden>
+    <p class="outlet" data-outlet></p>
+    <h1>Register this phone</h1>
+    <p class="muted">One-time setup. Choose your name and enter the PIN from your manager.</p>
+    <label for="staffSel">Your name</label>
+    <select id="staffSel"><option value="">Choose…</option></select>
+    <label for="pin">PIN</label>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••">
+    <button id="regBtn" class="primary" type="button">Register</button>
+    <p class="err" id="regErr" role="alert"></p>
+  </section>
+
+  <section id="s-ready" hidden>
+    <p class="outlet" data-outlet></p>
+    <h1 id="hello">Hi</h1>
+    <div class="clock" id="clock">--:--</div>
+    <p class="date" id="today"></p>
+    <p class="muted small" id="shift"></p>
+    <button id="punchBtn" class="punch" type="button"><span id="punchLabel">Clock in</span><small id="punchSub">Tap to confirm</small></button>
+    <p class="gps" id="gps">Getting your location…</p>
+    <p class="muted small" id="lastInfo"></p>
+    <p class="err" id="punchErr" role="alert"></p>
+  </section>
+
+  <section id="s-done" hidden>
+    <div class="tick" id="tick">✓</div>
+    <h1 id="doneTitle">Clocked in</h1>
+    <div class="big-time" id="doneTime"></div>
+    <p class="muted" id="doneWhere"></p>
+    <p class="note" id="doneNote" hidden></p>
+    <p class="muted small" style="margin-top:18px">You can close this page now.</p>
+  </section>
+
+  <section id="s-error" hidden>
+    <h1>Can't clock in yet</h1>
+    <p class="muted" id="errMsg"></p>
+    <button class="primary" type="button" onclick="location.reload()">Try again</button>
+  </section>
+</main>
+
+<footer id="foot" hidden>Not your phone? <button class="link" id="forget" type="button">Remove registration</button></footer>
+
+<script>
+/* ===== Paste your Apps Script web app URL here (ends in /exec) ===== */
+const API_URL = 'https://script.google.com/macros/s/AKfycbwo0V_auFh2yfogphOrOs8Dyuw_mBmHFA_PkKwcDHAQo0kHZhxQRj4J25kZRJEsb0Ob/exec';
+/* ==================================================================== */
+
+const TOKEN_KEY = 'footnote_clock_token';
+const outletId = (new URLSearchParams(location.search).get('o') || '').trim();
+const $ = id => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); return localStorage.getItem(k) === v; } catch (e) { return false; } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+};
+let gpsPromise = null;
+let busy = false;
+
+function show(id) {
+  document.querySelectorAll('main > section').forEach(s => { s.hidden = s.id !== id; });
+  $('foot').hidden = id !== 's-ready';
+}
+function fail(msg) { $('errMsg').textContent = msg; show('s-error'); }
+function setErr(el, msg) { el.textContent = msg || ''; el.classList.toggle('show', !!msg); }
+function setOutlet(name) { document.querySelectorAll('[data-outlet]').forEach(e => { e.textContent = name; }); }
+
+async function api(action, body) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 30000);
+  try {
+    // text/plain keeps this a "simple" request, so Apps Script needs no CORS preflight.
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ action: action }, body)),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function locate() {
+  if (!('geolocation' in navigator)) return Promise.resolve({ error: "This browser can't share your location." });
+  return new Promise(resolve => {
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }),
+      e => resolve({ error: e.code === 1
+        ? 'Location is blocked. Allow location for this page (browser settings), then try again.'
+        : "Couldn't find your location. Move near the entrance or a window." }),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 15000 });
+  });
+}
+
+function startGps() {
+  const el = $('gps');
+  el.className = 'gps';
+  el.textContent = 'Getting your location…';
+  gpsPromise = locate().then(r => {
+    if (r.error) { el.className = 'gps bad'; el.textContent = r.error; }
+    else { el.className = 'gps ok'; el.textContent = '● Location ready (±' + Math.round(r.acc) + ' m)'; }
+    return r;
+  });
+}
+
+function tickClock() {
+  const now = new Date();
+  $('clock').textContent = now.toLocaleTimeString('en-SG', { hour: 'numeric', minute: '2-digit' });
+  $('today').textContent = now.toLocaleDateString('en-SG', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+async function init() {
+  if (!outletId) return fail('Tap your phone on the FootNote clock-in card to open this page.');
+  if (API_URL.indexOf('PASTE_') === 0) return fail('Setup is not finished: the API address is missing in index.html.');
+  show('s-loading');
+  let res;
+  try {
+    res = await api('init', { outlet: outletId, token: store.get(TOKEN_KEY) || '' });
+  } catch (e) {
+    return fail('No connection. Check your mobile data or Wi-Fi and try again.');
+  }
+  if (!res.ok) return fail(res.error || 'Something went wrong.');
+  setOutlet(res.outlet.name);
+  if (!res.registered) {
+    store.del(TOKEN_KEY);
+    const sel = $('staffSel');
+    sel.length = 1;
+    res.staff.forEach(s => sel.add(new Option(s.name, s.id)));
+    $('pin').value = '';
+    setErr($('regErr'), '');
+    show('s-register');
+    return;
+  }
+  ready(res);
+}
+
+function ready(res) {
+  $('hello').textContent = 'Hi ' + res.name;
+  const isOut = res.next === 'OUT';
+  $('punchBtn').classList.toggle('out', isOut);
+  $('punchLabel').textContent = isOut ? 'Clock out' : 'Clock in';
+  $('punchSub').textContent = 'Tap to confirm';
+  $('punchBtn').disabled = false;
+  $('shift').textContent = res.shift ? "Today's shift: " + res.shift : '';
+  $('lastInfo').textContent = res.last
+    ? 'Last: clocked ' + res.last.type.toLowerCase() + ' ' + res.last.time
+    : '';
+  setErr($('punchErr'), '');
+  tickClock();
+  show('s-ready');
+  startGps();
+}
+
+$('regBtn').addEventListener('click', async () => {
+  if (busy) return;
+  const staffId = $('staffSel').value, pin = $('pin').value.trim();
+  if (!staffId || !pin) return setErr($('regErr'), 'Choose your name and enter your PIN.');
+  busy = true; $('regBtn').disabled = true; $('regBtn').textContent = 'Registering…';
+  setErr($('regErr'), '');
+  try {
+    const res = await api('register', { staffId: staffId, pin: pin, device: navigator.userAgent });
+    if (!res.ok) { setErr($('regErr'), res.error); return; }
+    if (!store.set(TOKEN_KEY, res.token)) {
+      setErr($('regErr'), "This browser can't remember you (private browsing?). Open the page in normal mode and register again.");
+      return;
+    }
+    busy = false;
+    await init();
+  } catch (e) {
+    setErr($('regErr'), 'No connection. Please try again.');
+  } finally {
+    busy = false; $('regBtn').disabled = false; $('regBtn').textContent = 'Register';
+  }
+});
+$('pin').addEventListener('keydown', e => { if (e.key === 'Enter') $('regBtn').click(); });
+
+$('punchBtn').addEventListener('click', async () => {
+  if (busy) return;
+  busy = true;
+  const btn = $('punchBtn');
+  const label = $('punchLabel').textContent;
+  btn.disabled = true;
+  $('punchSub').textContent = 'Saving…';
+  setErr($('punchErr'), '');
+  try {
+    const gps = await (gpsPromise || locate());
+    const res = await api('punch', {
+      outlet: outletId, token: store.get(TOKEN_KEY) || '',
+      lat: gps.error ? null : gps.lat, lng: gps.error ? null : gps.lng, acc: gps.error ? null : gps.acc,
+    });
+    if (res.ok) return done(res);
+    if (res.reregister) { store.del(TOKEN_KEY); busy = false; return init(); }
+    setErr($('punchErr'), res.error);
+    if (res.needLocation || res.retry) startGps();
+  } catch (e) {
+    setErr($('punchErr'), 'No connection, so nothing was saved. Please try again.');
+  } finally {
+    busy = false;
+    btn.disabled = false;
+    $('punchLabel').textContent = label;
+    $('punchSub').textContent = 'Tap to confirm';
+  }
+});
+
+function done(res) {
+  const isOut = res.type === 'OUT';
+  $('tick').classList.toggle('out', isOut);
+  $('doneTitle').textContent = (res.duplicate ? 'Already clocked ' : 'Clocked ') + (isOut ? 'out' : 'in');
+  $('doneTime').textContent = res.time;
+  $('doneWhere').textContent = res.name + ' · ' + res.outletName;
+  const note = $('doneNote');
+  note.hidden = true; note.className = 'note';
+  if (res.duplicate) {
+    note.textContent = 'You just tapped, so we kept your earlier record.'; note.hidden = false;
+  } else if (res.lateMin) {
+    note.textContent = 'Recorded as ' + res.lateMin + ' min late for your shift.'; note.className = 'note warn'; note.hidden = false;
+  } else if (isOut && res.hours) {
+    note.textContent = 'Shift length: ' + fmtHours(res.hours) + '. Thank you!'; note.hidden = false;
+  } else if (!isOut) {
+    note.textContent = 'Have a good shift!'; note.hidden = false;
+  }
+  if (navigator.vibrate) navigator.vibrate(80);
+  show('s-done');
+}
+
+function fmtHours(h) {
+  const mins = Math.round(h * 60);
+  return Math.floor(mins / 60) + 'h ' + ('0' + (mins % 60)).slice(-2) + 'm';
+}
+
+$('forget').addEventListener('click', () => {
+  if (!confirm('Remove this phone? The next person will need their PIN to register.')) return;
+  store.del(TOKEN_KEY);
+  init();
+});
+
+setInterval(tickClock, 1000);
+init();
+</script>
+</body>
+</html>
