@@ -130,6 +130,7 @@
     <p class="date" id="today"></p>
     <p class="muted small" id="shift"></p>
     <button id="punchBtn" class="punch" type="button"><span id="punchLabel">Clock in</span><small id="punchSub">Tap to confirm</small></button>
+    <p class="small" style="margin:0 0 12px"><button class="link" id="switchBtn" type="button">Clock out instead</button></p>
     <p class="gps" id="gps">Getting your location…</p>
     <p class="muted small" id="lastInfo"></p>
     <p class="err" id="punchErr" role="alert"></p>
@@ -168,6 +169,7 @@ const store = {
 };
 let gpsPromise = null;
 let busy = false;
+let nextType = 'IN';
 
 function show(id) {
   document.querySelectorAll('main > section').forEach(s => { s.hidden = s.id !== id; });
@@ -252,8 +254,10 @@ async function init() {
 function ready(res) {
   $('hello').textContent = 'Hi ' + res.name;
   const isOut = res.next === 'OUT';
+  nextType = isOut ? 'OUT' : 'IN';
   $('punchBtn').classList.toggle('out', isOut);
   $('punchLabel').textContent = isOut ? 'Clock out' : 'Clock in';
+  $('switchBtn').textContent = isOut ? 'Clock in instead' : 'Clock out instead';
   $('punchSub').textContent = 'Tap to confirm';
   $('punchBtn').disabled = false;
   $('shift').textContent = res.shift ? "Today's shift: " + res.shift : '';
@@ -289,7 +293,13 @@ $('regBtn').addEventListener('click', async () => {
 });
 $('pin').addEventListener('keydown', e => { if (e.key === 'Enter') $('regBtn').click(); });
 
-$('punchBtn').addEventListener('click', async () => {
+$('punchBtn').addEventListener('click', () => doPunch(nextType));
+$('switchBtn').addEventListener('click', () => {
+  const other = nextType === 'OUT' ? 'IN' : 'OUT';
+  if (confirm('Record a clock ' + other.toLowerCase() + ' now?')) doPunch(other);
+});
+
+async function doPunch(type) {
   if (busy) return;
   busy = true;
   const btn = $('punchBtn');
@@ -300,7 +310,7 @@ $('punchBtn').addEventListener('click', async () => {
   try {
     const gps = await (gpsPromise || locate());
     const res = await api('punch', {
-      outlet: outletId, token: store.get(TOKEN_KEY) || '',
+      outlet: outletId, token: store.get(TOKEN_KEY) || '', type: type,
       lat: gps.error ? null : gps.lat, lng: gps.error ? null : gps.lng, acc: gps.error ? null : gps.acc,
     });
     if (res.ok) return done(res);
@@ -315,7 +325,7 @@ $('punchBtn').addEventListener('click', async () => {
     $('punchLabel').textContent = label;
     $('punchSub').textContent = 'Tap to confirm';
   }
-});
+}
 
 function done(res) {
   const isOut = res.type === 'OUT';
